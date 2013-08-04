@@ -1,0 +1,17 @@
+
+CREATE DATABASE `aws_ses_feedback_reporter`;
+USE `aws_ses_feedback_reporter`;
+
+DROP TABLE IF EXISTS `bounce`;
+CREATE TABLE IF NOT EXISTS `bounce` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `content_type` VARCHAR(255) NOT NULL,
+  `raw` TEXT NOT NULL,
+  `type` VARCHAR(255) NOT NULL,
+  `sub_type` VARCHAR(255) NOT NULL,
+  `recipient` VARCHAR(255) NOT NULL,
+  `status` VARCHAR(255) NULL,
+  `action` VARCHAR(255) NULL,
+  PRIMARY KEY (`id`),
+  INDEX (`recipient`)
+);
