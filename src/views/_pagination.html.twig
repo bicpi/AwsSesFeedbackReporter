@@ -1,0 +1,15 @@
+{% set data = pagination.paginationData %}
+<p class="pull-left">{{ data.totalCount }} result(s)</p>
+{% if data.pageCount > 1 %}
+    <ul class="pagination pull-right">
+        {% if data.first < data.current %}
+            <li><a href="{{ path(app.request.get('_route'), app.request.query.all|merge({'page': data.current-1})) }}">&laquo;</a></li>
+        {% endif %}
+        {% for p in 1..data.lastPageInRange %}
+            <li class="{% if p == data.current %}active{% endif %}"><a href="{{ path(app.request.get('_route'), app.request.query.all|merge({'page': p})) }}">{{ p }}</a></li>
+        {% endfor %}
+        {% if data.last > data.current %}
+            <li><a href="{{ path(app.request.get('_route'), app.request.query.all|merge({'page': data.current+1})) }}">&raquo;</a></li>
+        {% endif %}
+    </ul>
+{% endif %}

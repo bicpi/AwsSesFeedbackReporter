@@ -1,0 +1,22 @@
+{% extends "base.html.twig" %}
+
+{% block body %}
+    {% if subscriptionConfirmations %}
+        <h2>Subscription Confirmations</h2>
+        <table class="table table-striped table-bordered table-hover table-condensed">
+            <tbody>
+                {% for subscriptionConfirmation in subscriptionConfirmations %}
+                    <tr>
+                        <td>
+                            <b>{{ subscriptionConfirmation.Timestamp|date('d.m.Y H:m:s') }}</b><br />
+                            {{ subscriptionConfirmation.Message|e|nl2br|replace({(subscriptionConfirmation.TopicArn): '<i>'~subscriptionConfirmation.TopicArn~'</i>'})|raw }}
+                            <a href="{{ subscriptionConfirmation.SubscribeURL }}" target="_blank">Click here to Subscribe!</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No subscription confirmations available.</p>
+    {% endif %}
+{% endblock %}

@@ -1,24 +1,50 @@
 {% extends "base.html.twig" %}
 
 {% block body %}
-    {% if bounces %}
+    <div class="page-header">
         <h1>Bounces</h1>
+    </div>
+    <form action="{{ path('bounces') }}" method="get" class="well">
+        <div class="row">
+            <div class="form-group col-lg-4">
+                <label for="filter_mail_source">Sender address</label>
+                <input id="filter_mail_source" type="text" value="{{ filter.mail_source|default('') }}" class="form-control" name="filter[mail_source]" placeholder="sendout-id@example.com">
+            </div>
+            <div class="form-group col-lg-4">
+                <label for="filter_bounce_recipient">Bounced recipient</label>
+                <input id="filter_bounce_recipient" type="text" value="{{ filter.bounce_recipient|default('') }}" class="form-control" name="filter[bounce_recipient]" placeholder="bounced-recipient@example.com">
+            </div>
+        </div>
+        <div class="text-right">
+            <a href="{{ path('bounces') }}" class="btn btm-default btn-sm">Reset</a>
+            <button type="submit" class="btn btn-default btn-sm">Filter</button>
+        </div>
+    </form>
+    {% if pagination|length %}
         <table class="table table-striped table-bordered table-hover table-condensed">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Raw</th>
+                    <th style="width:400px">Source Email</th>
+                    <th>Bounced Recipient</th>
                 </tr>
             </thead>
             <tbody>
-                {% for bounce in bounces %}
+                {% for bounce in pagination %}
                     <tr>
-                        <td>{{ bounce.id }}</td>
-                        <td>{{ bounce.raw|nl2br }}</td>
+                        <td>
+                            <i>{{ bounce.mail_timestamp|date('d.m.Y H:m:s') }}</i><br />
+                            <b>{{ bounce.mail_source }}</b><br>
+                        </td>
+                        <td>
+                            <i>{{ bounce.bounce_timestamp|date('d.m.Y H:m:s') }} &ndash; {{ bounce.bounce_type }} &gt; {{ bounce.bounce_subType }}</i><br />
+                            <b>{{ bounce.bounce_recipient }}</b><br />
+                            {{ bounce.bounce_diagnosticCode|default('No error message available') }}<br />
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% include '_pagination.html.twig' %}
     {% else %}
         <p>No bounces available.</p>
     {% endif %}

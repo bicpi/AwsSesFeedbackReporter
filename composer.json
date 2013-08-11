@@ -4,6 +4,13 @@
         "symfony/yaml": "~2.3",
         "doctrine/dbal": "~2.3",
         "twig/twig": "~1.13",
-        "symfony/property-access": "~2.3"
+        "symfony/twig-bridge": "~2.3",
+        "symfony/property-access": "~2.3",
+        "knplabs/knp-components": "~1.2"
+    },
+    "autoload": {
+        "psr-0": {
+            "bicpi": "src/"
+        }
     }
 }

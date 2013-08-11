@@ -3,30 +3,23 @@
 require_once __DIR__.'/../vendor/autoload.php';
 
 use Silex\Application;
-use Silex\Provider\DoctrineServiceProvider;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PropertyAccess\PropertyAccess;
-
-$parameters = Yaml::parse(file_get_contents(__DIR__.'/../src/parameters.yml'));
+use bicpi\MongoDbServiceProvider;
+use Knp\Component\Pager\Paginator;
 
 $app = new Application();
-$app['debug'] = $parameters['debug'];
-
-$app->register(new DoctrineServiceProvider, array(
-    'db.options' => array(
-        'driver'    => 'pdo_mysql',
-        'dbname'    => $parameters['dbname'],
-        'user'      => $parameters['dbuser'],
-        'password'  => $parameters['dbpassword'],
-    )
-));
+$app['parameters'] = Yaml::parse(file_get_contents(__DIR__.'/../src/parameters.yml'));
+$app['debug'] = $app['parameters']['debug'];
 
 $app->register(new Silex\Provider\TwigServiceProvider(), array(
     'twig.path' => __DIR__.'/../src/views',
 ));
 
+$app->register(new MongoDbServiceProvider(), array());
+$app->register(new Silex\Provider\UrlGeneratorServiceProvider());
 
 $app->error(function (\Exception $e, $code) use ($app) {
     if ($app['debug']) {
@@ -48,60 +41,104 @@ $app->error(function (\Exception $e, $code) use ($app) {
     return new Response($message, $code);
 });
 
-$app->get('/', function () use ($app) {
-    $sql = "SELECT * FROM bounce";
-    $bounces = $app['db']->fetchAll($sql);
+$app->get('/', function (Request $request) use ($app) {
+    $page = $request->query->get('page', 1);
+    $filter = array_filter($request->query->get('filter', array()));
+    $bounces = $app['mongodb']->$app['parameters']['dbname']->bounces
+        ->find(array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter))
+        ->sort(array('bounce_timestamp' => -1));
+
+    $paginator = new Paginator();
+    $paginator->subscribe(new \bicpi\MongoDbSubscriber());
+    $pagination = $paginator->paginate($bounces, $page, 2);
 
     return $app['twig']->render('bounces.html.twig', array(
-        'bounces' => $bounces
+        'page' => $page,
+        'filter' => $filter,
+        'pagination' => $pagination
     ));
-});
+})->bind('bounces');
+
+$app->get('/complaints', function (Request $request) use ($app) {
+    $complaints = $app['mongodb']->$app['parameters']['dbname']->complaints->find();
+
+    return $app['twig']->render('complaints.html.twig', array(
+        'complaints' => $complaints
+    ));
+})->bind('complaints');
+
+$app->get('/subscription-confirmations', function (Request $request) use ($app) {
+    $subscriptionConfirmations = $app['mongodb']->$app['parameters']['dbname']->subscriptionConfirmations->find();
+
+    return $app['twig']->render('subscription-confirmations.html.twig', array(
+        'subscriptionConfirmations' => $subscriptionConfirmations
+    ));
+})->bind('subscriptionConfirmations');
 
 $app->post('/', function (Request $request) use ($app) {
     $notification = json_decode($request->getContent(), true);
-    $request->request->replace(is_array($notification) ? $notification : array());
-
     $accessor = PropertyAccess::createPropertyAccessor();
+    $type = $accessor->getValue($notification, '[Type]');
 
-    $entity = array(
-        'content_type' => $request->getContentType(),
-        'raw' => $request->getContent(),
-    );
-
-    switch ($accessor->getValue($notification, '[Type]')) {
-        case 'SubscriptionConfirmation':
-            $app['db']->insert('subscription_confirmation', $entity);
-            break;
-        case 'Notification':
-            $message = $accessor->getValue($notification, '[Message]');
-            file_put_contents('output.txt', print_r($message, 1));
-            return;
-            switch ($accessor->getValue($message, '[notificationType]')) {
-                case 'Bounce':
-                    $entity = $entity + array(
-                        'type' => $accessor->getValue($message, '[bounce][bounceType]'),
-                        'sub_type' => $accessor->getValue($message, '[bounce][bounceSubType]'),
-                    );
-                    foreach ($accessor->getValue($message, '[bounce][boundedRecipients]') as $recipient) {
-                        $bounce = $entity + array(
-                                'emailAddress' => $accessor->getValue($$recipient, '[emailAddress]'),
-                                'status' => $accessor->getValue($$recipient, '[status]'),
-                                'action' => $accessor->getValue($$recipient, '[action]'),
-                            );
-                        $app['db']->insert('bounce', $bounce);
-                    }
-                    break;
-                case 'Complaint':
-                    $app['db']->insert('complaint', $entity);
-                    break;
-                default:
-                    // Not implemented
-                    return new Response('', 501);
+        file_put_contents('notification.txt', json_encode($notification));
+    if ('SubscriptionConfirmation' === $type) {
+        $app['mongodb']->$app['parameters']['dbname']->notifications->insert(array(
+            'type' => $type,
+            'raw' => $request->getContent(),
+            'MessageId' => $accessor->getValue($notification, '[MessageId]'),
+            'Token' => $accessor->getValue($notification, '[Token]'),
+            'TopicArn' => $accessor->getValue($notification, '[TopicArn]'),
+            'Message' => $accessor->getValue($notification, '[Message]'),
+            'SubscribeURL' => $accessor->getValue($notification, '[SubscribeURL]'),
+            'Timestamp' => $accessor->getValue($notification, '[Timestamp]'),
+            'SignatureVersion' => $accessor->getValue($notification, '[SignatureVersion]'),
+            'Signature' => $accessor->getValue($notification, '[Signature]'),
+            'SigningCertURL' => $accessor->getValue($notification, '[SigningCertURL]'),
+        ));
+    } else if ('Notification' === $type) {
+        $message = json_decode($accessor->getValue($notification, '[Message]'), true);
+        if ('Bounce' === $accessor->getValue($message, '[notificationType]')) {
+            foreach ($accessor->getValue($message, '[bounce][bouncedRecipients]') as $bouncedRecipient) {
+                $app['mongodb']->$app['parameters']['dbname']->bounces->insert(array(
+                    'type' => $accessor->getValue($message, '[notificationType]'),
+                    'raw' => $request->getContent(),
+                    'bounce_type' => $accessor->getValue($message, '[bounce][bounceType]'),
+                    'bounce_subType' => $accessor->getValue($message, '[bounce][bounceSubType]'),
+                    'bounce_reportingMTA' => $accessor->getValue($message, '[bounce][reportingMTA]'),
+                    'bounce_recipient' => $accessor->getValue($bouncedRecipient, '[emailAddress]'),
+                    'bounce_status' => $accessor->getValue($bouncedRecipient, '[status]'),
+                    'bounce_action' => $accessor->getValue($bouncedRecipient, '[action]'),
+                    'bounce_diagnosticCode' => $accessor->getValue($bouncedRecipient, '[diagnosticCode]'),
+                    'bounce_timestamp' => $accessor->getValue($message, '[bounce][timestamp]'),
+                    'bounce_feedbackId' => $accessor->getValue($message, '[bounce][feedbackId]'),
+                    'mail_timestamp' => $accessor->getValue($message, '[mail][timestamp]'),
+                    'mail_messageId' => $accessor->getValue($message, '[mail][messageId]'),
+                    'mail_source' => $accessor->getValue($message, '[mail][source]'),
+                    'mail_destination' => implode(', ', $accessor->getValue($message, '[mail][destination]')),
+                ));
             }
-            break;
+        }
+        if ('Complaint' === $accessor->getValue($message, '[notificationType]')) {
+            foreach ($accessor->getValue($message, '[complaint][complainedRecipients]') as $complainedRecipient) {
+                $app['mongodb']->$app['parameters']['dbname']->complaints->insert(array(
+                    'type' => $accessor->getValue($message, '[notificationType]'),
+                    'raw' => $request->getContent(),
+                    'complaint_recipient' => $accessor->getValue($complainedRecipient, '[emailAddress]'),
+                    'complaint_userAgent' => $accessor->getValue($message, '[complaint][userAgent]'),
+                    'complaint_complaintFeedbackType' => $accessor->getValue($message, '[complaint][complaintFeedbackType]'),
+                    'complaint_arrivalDate' => $accessor->getValue($message, '[complaint][arrivalDate]'),
+                    'complaint_timestamp' => $accessor->getValue($message, '[complaint][timestamp]'),
+                    'complaint_feedbackId' => $accessor->getValue($message, '[complaint][feedbackId]'),
+                    'mail_timestamp' => $accessor->getValue($message, '[mail][timestamp]'),
+                    'mail_messageId' => $accessor->getValue($message, '[mail][messageId]'),
+                    'mail_source' => $accessor->getValue($message, '[mail][source]'),
+                    'mail_destination' => implode(', ', $accessor->getValue($message, '[mail][destination]')),
+                ));
+            }
+        }
     }
 
-    return new Response('', 201);
+    return new Response('', 503);
 });
 
 $app->match('/post-raw', function (Request $request) use ($app) {
@@ -123,6 +160,7 @@ $app->match('/post-raw', function (Request $request) use ($app) {
 
     return $app['twig']->render('post-raw.html.twig');
 })
-->method('GET|POST');
+->method('GET|POST')
+->bind('postRaw');
 
 $app->run();
