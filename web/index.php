@@ -42,15 +42,53 @@ $app->error(function (\Exception $e, $code) use ($app) {
 });
 
 $app->get('/', function (Request $request) use ($app) {
-    $page = $request->query->get('page', 1);
     $filter = array_filter($request->query->get('filter', array()));
     $bounces = $app['mongodb']->$app['parameters']['dbname']->bounces
         ->find(array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter))
         ->sort(array('bounce_timestamp' => -1));
 
+    if ($export = $request->query->get('_export')) {
+        $filename = '%s_bounces.csv';
+        $csv = array();
+        if ('recipients_only' == $export) {
+            $filename = '%s_bounces_recipients_only.csv';
+            foreach ($bounces as $bounce) {
+                $line = array();
+                $line[] = $bounce['bounce_recipient'];
+                $csv[] = implode(',', $line);
+            }
+        } else if ('detailed' == $export) {
+            $filename = '%s_bounces_detailed.csv';
+            $csv[] = 'Bounced recipient,Bounced at,Bounce type,Bounce message,Origin sendout at,Sendout return path';
+            foreach ($bounces as $bounce) {
+                $line = array();
+                $line[] = $bounce['bounce_recipient'];
+                $line[] = $bounce['bounce_timestamp'];
+                $line[] = $bounce['bounce_type'];
+                $line[] = $bounce['bounce_subType'];
+                $line[] = $bounce['bounce_diagnosticCode'];
+                $line[] = $bounce['mail_timestamp'];
+                $line[] = $bounce['mail_source'];
+                $line = array_map(function($val){ return sprintf('"%s"', str_replace('"', '\"', $val)); }, $line);
+                $csv[] = implode(',', $line);
+            }
+        } else {
+            throw new \Exception('Export type not implemented.');
+        }
+        $content = implode("\n", $csv);
+        $filename = sprintf($filename, date('Y-m-d_H-i-s'));
+
+        return new Response($content, 200, array(
+           'Content-Type' => 'text/csv;charset=utf-8',
+           'Content-Length' => strlen($content),
+           'Content-Disposition' => sprintf('attachment; filename="%s"', urlencode($filename)),
+       ));
+    }
+
+    $page = $request->query->get('page', 1);
     $paginator = new Paginator();
     $paginator->subscribe(new \bicpi\MongoDbSubscriber());
-    $pagination = $paginator->paginate($bounces, $page, 2);
+    $pagination = $paginator->paginate($bounces, $page, $app['parameters']['limit_per_page']);
 
     return $app['twig']->render('bounces.html.twig', array(
         'page' => $page,
