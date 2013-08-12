@@ -17,11 +17,9 @@
     <body>
         <div class="navbar navbar-fixed-top">
             <div class="container">
-                <a class="navbar-brand" href="{{ path('bounces') }}"><img src="/images/logo.png" width="114" height="19" alt="Onemedia" /></a>
+                <a class="navbar-brand" href="{{ path('notifications') }}"><img src="/images/logo.png" width="114" height="19" alt="Onemedia" /></a>
                 <ul class="nav navbar-nav">
-                    <li{% if 'bounces' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('bounces') }}">Bounces</a></li>
-                    <li{% if 'complaints' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('complaints') }}">Complaints</a></li>
-                    <li{% if 'subscriptionConfirmations' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('subscriptionConfirmations') }}">Subscription Confirmations</a></li>
+                    <li{% if 'notifications' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('notifications') }}">Notifications</a></li>
                     <li{% if 'postRaw' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('postRaw') }}">Post Raw</a></li>
                 </ul>
             </div>
