@@ -1,0 +1,18 @@
+default:
+    target:
+        host: Thaneller
+    commands:
+        post_deploy:
+            - "if [ ! -f src/parameters.yml ]; then cp src/parameters.yml.dist src/parameters.yml; fi"
+    excludes: |
+        .deployer.yml
+        .gitignore
+        .gitkeep
+        /composer.json
+        /composer.lock
+        /src/parameters.yml
+        /logs/*
+
+prod:
+    target:
+        dir: /var/www/prod/onemedia/aws-ses-feedback-reporter
