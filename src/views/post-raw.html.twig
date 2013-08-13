@@ -2,14 +2,13 @@
 
 {% block body %}
     <h1>Send raw POST data</h1>
-
-    <form action="" method="post" class="form-horizontal">
+    <form action="{{ path('postRaw') }}" method="post">
         <p>
-            Raw body:<br />
-            <textarea name="raw" style="width:100%;height:150px"></textarea><br />
+            <label for="raw">Raw body</label>
+            <textarea id="raw" name="raw" class="form-control" style="height:150px"></textarea><br />
         </p>
         <p>
-            <button type="submit">Submit</button>
+            <button type="submit" class="btn btn-default">Submit</button>
         </p>
     </form>
 {% endblock %}

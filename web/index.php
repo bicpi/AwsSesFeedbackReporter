@@ -13,11 +13,9 @@ use Knp\Component\Pager\Paginator;
 $app = new Application();
 $app['parameters'] = Yaml::parse(file_get_contents(__DIR__.'/../src/parameters.yml'));
 $app['debug'] = $app['parameters']['debug'];
-
 $app->register(new Silex\Provider\TwigServiceProvider(), array(
     'twig.path' => __DIR__.'/../src/views',
 ));
-
 $app->register(new MongoDbServiceProvider(), array());
 $app->register(new Silex\Provider\UrlGeneratorServiceProvider());
 $app['accessor'] = PropertyAccess::createPropertyAccessor();

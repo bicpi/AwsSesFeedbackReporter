@@ -2,7 +2,7 @@
 
 namespace bicpi;
 
-use \Silex\ServiceProviderInterface;
+use Silex\ServiceProviderInterface;
 use Silex\Application;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 

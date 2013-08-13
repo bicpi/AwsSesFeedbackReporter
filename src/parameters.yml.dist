@@ -1,4 +1,5 @@
 debug: false
-dbname: ~
+dbname: aws_ses_feedback_reporter
+limit_per_page: 5
 dbuser: ~
 dbpassword: ~
