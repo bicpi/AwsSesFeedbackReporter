@@ -61,12 +61,6 @@ $app->get('/', function () use ($app) {
     return $app->redirect($app['url_generator']->generate('notifications'));
 })->bind('home');
 
-$app->get('/admin/notification/{_id}/remove', function (Request $request, $_id) use ($app) {
-    $app['mongodb']->$app['parameters']['dbname']->notifications->remove(array('_id' => new \MongoId($_id)));
-
-    return $app->redirect($app['url_generator']->generate('notifications'));
-})->bind('deleteNotification');
-
 $app->get('/notifications', function (Request $request) use ($app) {
     $filter = array_filter($request->query->get('filter', array()));
 
@@ -74,7 +68,7 @@ $app->get('/notifications', function (Request $request) use ($app) {
         return export($export, $filter);
     }
 
-    $notifications = $app['mongodb']->$app['parameters']['dbname']->notifications
+    $notifications = $app['mongodb']->notifications
         ->find(array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter))
         ->sort(array('timestamp' => -1));
 
@@ -89,6 +83,12 @@ $app->get('/notifications', function (Request $request) use ($app) {
         'pagination' => $pagination
     ));
 })->bind('notifications');
+
+$app->get('/admin/notification/{_id}/remove', function (Request $request, $_id) use ($app) {
+    $app['mongodb']->notifications->remove(array('_id' => new \MongoId($_id)));
+
+    return $app->redirect($app['url_generator']->generate('notifications'));
+})->bind('deleteNotification');
 
 $app->match('/admin/post-raw', function (Request $request) use ($app) {
     if ('POST' == $request->getMethod()) {
@@ -161,14 +161,14 @@ function export($exportType, array $filter)
         )
     );
 
-    $bounces = $app['mongodb']->$app['parameters']['dbname']->notifications
+    $bounces = $app['mongodb']->notifications
         ->find(array_merge(
             array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter),
             array('notificationType' => 'Bounce')
         ))
         ->sort(array('timestamp' => -1));
 
-    $complaints = $app['mongodb']->$app['parameters']['dbname']->notifications
+    $complaints = $app['mongodb']->notifications
         ->find(array_merge(
             array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter),
             array('notificationType' => 'Complaint')
@@ -320,7 +320,7 @@ function createBounce($message)
 
     $accessor = $app['accessor'];
     foreach ($accessor->getValue($message, '[bounce][bouncedRecipients]') as $bouncedRecipient) {
-        $app['mongodb']->$app['parameters']['dbname']->notifications->insert(array(
+        $app['mongodb']->notifications->insert(array(
             'notificationType' => $accessor->getValue($message, '[notificationType]'),
             'raw' => $app['request']->getContent(),
             'type' => $accessor->getValue($message, '[bounce][bounceType]'),
@@ -348,7 +348,7 @@ function createComplaint($message)
 
     $accessor = $app['accessor'];
     foreach ($accessor->getValue($message, '[complaint][complainedRecipients]') as $complainedRecipient) {
-        $app['mongodb']->$app['parameters']['dbname']->notifications->insert(array(
+        $app['mongodb']->notifications->insert(array(
             'notificationType' => $accessor->getValue($message, '[notificationType]'),
             'raw' => $app['request']->getContent(),
             'recipient' => $accessor->getValue($complainedRecipient, '[emailAddress]'),

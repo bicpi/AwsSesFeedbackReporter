@@ -14,9 +14,15 @@ class MongoDbServiceProvider implements ServiceProviderInterface
     {
         $this->app = $app;
         $app['mongodb'] = $app->share(function () use ($app) {
-            $mongo = new \MongoClient();
+            $options = array();
+            if ($app['parameters']['dbuser']) {
+                $options['username'] = $app['parameters']['dbuser'];
+                $options['password'] = $app['parameters']['dbpassword'];
+            }
 
-            return $mongo;
+            $mongo = new \MongoClient(null, $options);
+
+            return $mongo->$app['parameters']['dbname'];
         });
     }
 
