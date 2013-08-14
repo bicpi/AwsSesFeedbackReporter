@@ -5,7 +5,9 @@
         "twig/twig": "~1.13",
         "symfony/twig-bridge": "~2.3",
         "symfony/property-access": "~2.3",
-        "knplabs/knp-components": "~1.2"
+        "knplabs/knp-components": "~1.2",
+        "symfony/security": "~2.3",
+        "codeplex/phpexcel": "~1.7"
     },
     "autoload": {
         "psr-0": {

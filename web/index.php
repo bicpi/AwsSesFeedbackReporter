@@ -18,6 +18,26 @@ $app->register(new Silex\Provider\TwigServiceProvider(), array(
 ));
 $app->register(new MongoDbServiceProvider(), array());
 $app->register(new Silex\Provider\UrlGeneratorServiceProvider());
+$app->register(new Silex\Provider\SecurityServiceProvider(), array(
+    'security.firewalls' => array(
+        'admin' => array(
+            'pattern' => '^/',
+            'http' => true,
+            'users' => array(
+                'onemedia' => array('ROLE_ONEMEDIA', 'GCxwA99MnR0quW7//L8bGoDa9bvJuhTQ07pN0mC3zMk7XgCGKMxLUO+L6FQKgjFMRcXdsSjTmYTPeT7VBgTsFQ=='),
+                'admin' => array('ROLE_ADMIN', '6sgg49Cz8sTsqAGm/EdbpH/aEklyKtHY2A0hNa/gH89lWODQ1s1JKJFAjnRtwuwXDFNIwOyGdD0PPTwgxzhUSA=='),
+            ),
+        ),
+    ),
+    'security.role_hierarchy' => array(
+        'ROLE_ADMIN' => array('ROLE_ONEMEDIA'),
+    ),
+    'security.access_rules' => array(
+        array('^/$', 'IS_AUTHENTICATED_ANONYMOUSLY'),
+        array('^/notifications', 'ROLE_ONEMEDIA'),
+        array('^/admin', 'ROLE_ADMIN'),
+    )
+));
 $app['accessor'] = PropertyAccess::createPropertyAccessor();
 
 $app->error(function (\Exception $e, $code) use ($app) {
@@ -37,15 +57,26 @@ $app->error(function (\Exception $e, $code) use ($app) {
     ));
 });
 
-$app->get('/', function (Request $request) use ($app) {
+$app->get('/', function () use ($app) {
+    return $app->redirect($app['url_generator']->generate('notifications'));
+})->bind('home');
+
+$app->get('/admin/notification/{_id}/remove', function (Request $request, $_id) use ($app) {
+    $app['mongodb']->$app['parameters']['dbname']->notifications->remove(array('_id' => new \MongoId($_id)));
+
+    return $app->redirect($app['url_generator']->generate('notifications'));
+})->bind('deleteNotification');
+
+$app->get('/notifications', function (Request $request) use ($app) {
     $filter = array_filter($request->query->get('filter', array()));
+
+    if ($export = $request->query->get('_export')) {
+        return export($export, $filter);
+    }
+
     $notifications = $app['mongodb']->$app['parameters']['dbname']->notifications
         ->find(array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter))
         ->sort(array('timestamp' => -1));
-
-    if ($export = $request->query->get('_export')) {
-        return export($export, $notifications);
-    }
 
     $page = $request->query->get('page', 1);
     $paginator = new Paginator();
@@ -59,11 +90,38 @@ $app->get('/', function (Request $request) use ($app) {
     ));
 })->bind('notifications');
 
+$app->match('/admin/post-raw', function (Request $request) use ($app) {
+    if ('POST' == $request->getMethod()) {
+        $ch = curl_init();
+        curl_setopt($ch,CURLOPT_URL, $request->getSchemeAndHttpHost());
+        curl_setopt($ch, CURLOPT_POST, 1)   ;
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $request->request->get('raw'));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: text/plain',
+                'Content-Length: ' . strlen($request->request->get('raw')))
+        );
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        return $app->redirect($app['url_generator']->generate('notifications'));
+    }
+
+    return $app['twig']->render('post-raw.html.twig');
+})
+->method('GET|POST')
+->bind('postRaw');
+
 $app->post('/', function (Request $request) use ($app) {
     $notification = json_decode($request->getContent(), true);
 
     if ('SubscriptionConfirmation' == $app['accessor']->getValue($notification, '[Type]')) {
-        file_put_contents(__DIR__.'/../logs/app.log', $request->getContent() . "\n");
+        $logfile = __DIR__.'/../logs/app.log';
+        $content = '';
+        if (file_exists($logfile)) {
+            $content = file_get_contents($logfile);
+        }
+        file_put_contents($logfile, $content.$request->getContent() . "\n");
 
         return new Response('', 201);
     }
@@ -80,35 +138,142 @@ $app->post('/', function (Request $request) use ($app) {
     }
 
     return new Response('', 503);
-});
-
-$app->match('/post-raw', function (Request $request) use ($app) {
-    if ('POST' == $request->getMethod()) {
-        $ch = curl_init();
-        curl_setopt($ch,CURLOPT_URL, $request->getSchemeAndHttpHost());
-        curl_setopt($ch, CURLOPT_POST, 1)   ;
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $request->request->get('raw'));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            'Content-Type: text/plain',
-            'Content-Length: ' . strlen($request->request->get('raw')))
-        );
-        $result = curl_exec($ch);
-        curl_close($ch);
-
-        return $app->redirect('/');
-    }
-
-    return $app['twig']->render('post-raw.html.twig');
-})
-->method('GET|POST')
-->bind('postRaw');
+})->bind('postNotification');
 
 $app->run();
 
 
-function export($exportType, $bounces)
+function export($exportType, array $filter)
 {
+    global $app;
+
+    $headingStyles = array(
+        'font' => array('bold' => true),
+        'fill' => array(
+            'type' => \PHPExcel_Style_Fill::FILL_SOLID,
+            'color' => array('argb' => 'F2F2F2'),
+        ),
+        'borders' => array(
+            'allborders' => array(
+                'style' => \PHPExcel_Style_Border::BORDER_THIN,
+                'color' => array('argb' => 'FFCCCCCC')
+            )
+        )
+    );
+
+    $bounces = $app['mongodb']->$app['parameters']['dbname']->notifications
+        ->find(array_merge(
+            array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter),
+            array('notificationType' => 'Bounce')
+        ))
+        ->sort(array('timestamp' => -1));
+
+    $complaints = $app['mongodb']->$app['parameters']['dbname']->notifications
+        ->find(array_merge(
+            array_map(function($val){ return array('$regex' => preg_quote($val));}, $filter),
+            array('notificationType' => 'Complaint')
+        ))
+        ->sort(array('timestamp' => -1));
+
+    $excel = new \PHPExcel();
+    $excel
+        ->getActiveSheet()
+        ->setTitle(sprintf('Bounces (%d)', $bounces->count()));
+
+    $excel
+        ->createSheet()
+        ->setTitle(sprintf('Complaints (%d)', $complaints->count()));
+
+    switch ($exportType) {
+        case 'recipients_only':
+            $sheet = $excel->getSheet(0);
+            $row = 1;
+            foreach ($bounces as $bounce) {
+                $col = 0;
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['recipient']);
+                $row++;
+            }
+            $sheet = $excel->getSheet(1);
+            $row = 1;
+            foreach ($complaints as $complaint) {
+                $col = 0;
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['recipient']);
+                $row++;
+            }
+            break;
+        case 'detailed':
+            $sheet = $excel->getSheet(0);
+            $headers = array(
+                'Bounced recipient',
+                'Bounced at',
+                'Sendout return path',
+                'Origin sendout at',
+                'Bounce type',
+                'Bounce subtype',
+                'Bounce message',
+            );
+            $row = 1;
+            $col = 0;
+            foreach ($headers as $header) {
+                $sheet->setCellValueByColumnAndRow($col++, $row, $header);
+            }
+            $row = 2;
+            foreach ($bounces as $bounce) {
+                $col = 0;
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['recipient']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['timestamp']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['mail_source']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['mail_timestamp']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['type']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['subType']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $bounce['diagnosticCode']);
+                $row++;
+            }
+            $sheet->getStyle(sprintf('A1:%s1', $sheet->getHighestColumn()))->applyFromArray($headingStyles);
+
+            $sheet = $excel->getSheet(1);
+            $headers = array(
+                'Complained recipient',
+                'Sendout return path',
+                'Complained at',
+                'Complained message',
+                'Origin sendout at',
+            );
+            $row = 1;
+            $col = 0;
+            foreach ($headers as $header) {
+                $sheet->setCellValueByColumnAndRow($col++, $row, $header);
+            }
+            $row = 2;
+            foreach ($complaints as $complaint) {
+                $col = 0;
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['recipient']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['mail_source']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['timestamp']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['complaintFeedbackType']);
+                $sheet->setCellValueByColumnAndRow($col++, $row, $complaint['mail_timestamp']);
+                $row++;
+            }
+            $sheet->getStyle(sprintf('A1:%s1', $sheet->getHighestColumn()))->applyFromArray($headingStyles);
+            break;
+        default:
+            throw new \Exception('Export type not implemented.');
+    }
+
+    ob_start();
+    \PHPExcel_IOFactory::createWriter($excel, 'Excel2007')->save('php://output');
+    $content = ob_get_clean();
+
+    $filename = sprintf('%s_%s_notifications.xlsx', date('Y-m-d_H-i-s'), $exportType);
+
+    return new Response($content, 200, array(
+        'Content-Type' => 'text/csv;charset=utf-8',
+        'Content-Length' => strlen($content),
+        'Content-Disposition' => sprintf('attachment; filename="%s"', urlencode($filename)),
+    ));
+    \PHPExcel_IOFactory::createWriter($excel, 'Excel2007')->save('php://output');
+    exit;
+
     $csv = array();
     switch ($exportType) {
         case 'recipients_only':

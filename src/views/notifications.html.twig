@@ -6,8 +6,8 @@
             <h1>
                 Notifications
                 <div class="pull-right">
-                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'detailed'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Notifications (csv)</a>
-                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'recipients_only'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Recipients only (csv)</a>
+                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'detailed'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Detailed</a>
+                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'recipients_only'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Recipients only</a>
                 </div>
             </h1>
         </div>
@@ -21,6 +21,9 @@
                     {% for notification in pagination %}
                         <tr>
                             <td>
+                                {% if is_granted('ROLE_ADMIN') %}
+                                    <a href="{{ path('deleteNotification', {_id: notification._id}) }}" class="close pull-right">&times;</a>
+                                {% endif %}
                                 <p>
                                     {% if 'Bounce' == notification.notificationType %}
                                         <i>Bounced at {{ notification.timestamp|date('d.m.Y H:m:s') }} &ndash; {{ notification.type }} &gt; {{ notification.subType }}</i><br />
