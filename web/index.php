@@ -20,7 +20,10 @@ $app->register(new MongoDbServiceProvider(), array());
 $app->register(new Silex\Provider\UrlGeneratorServiceProvider());
 $app->register(new Silex\Provider\SecurityServiceProvider(), array(
     'security.firewalls' => array(
-        'admin' => array(
+        'public' => array(
+            'pattern' => '^/'
+        ),
+        'backend' => array(
             'pattern' => '^/',
             'http' => true,
             'users' => array(
@@ -34,8 +37,8 @@ $app->register(new Silex\Provider\SecurityServiceProvider(), array(
     ),
     'security.access_rules' => array(
         array('^/$', 'IS_AUTHENTICATED_ANONYMOUSLY'),
-        array('^/notifications', 'ROLE_ONEMEDIA'),
-        array('^/admin', 'ROLE_ADMIN'),
+        #array('^/notifications', 'ROLE_ONEMEDIA'),
+        #array('^/admin', 'ROLE_ADMIN'),
     )
 ));
 $app['accessor'] = PropertyAccess::createPropertyAccessor();

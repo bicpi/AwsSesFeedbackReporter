@@ -18,6 +18,7 @@ class MongoDbServiceProvider implements ServiceProviderInterface
             if ($app['parameters']['dbuser']) {
                 $options['username'] = $app['parameters']['dbuser'];
                 $options['password'] = $app['parameters']['dbpassword'];
+                $options['db'] = $app['parameters']['dbname'];
             }
 
             $mongo = new \MongoClient(null, $options);
