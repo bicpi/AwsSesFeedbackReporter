@@ -6,8 +6,8 @@
             <h1>
                 Notifications
                 <div class="pull-right">
-                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'detailed'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Detailed</a>
-                    <a href="{{ path('notifications', app.request.query.all|merge({'_export': 'recipients_only'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Recipients only</a>
+                    <a href="{{ path('notificationsExport', app.request.query.all|merge({'exportType': 'detailed'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Detailed</a>
+                    <a href="{{ path('notificationsExport', app.request.query.all|merge({'exportType': 'recipients-only'})) }}" class="btn btn-default"><i class="icon-download-alt"></i> Report: Recipients only</a>
                 </div>
             </h1>
         </div>
