@@ -36,7 +36,6 @@ class PublicControllerProvider implements ControllerProviderInterface
             if (null === $notification) {
                 $app->abort(501, 'Invalid JSON');
             }
-
             $type = $accessor->getValue($notification, '[Type]');
             if ('SubscriptionConfirmation' == $type) {
                 $logfile = __DIR__.'/../logs/app.log';
