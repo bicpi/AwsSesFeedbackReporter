@@ -18,13 +18,16 @@
         <div class="navbar navbar-fixed-top">
             <div class="container">
                 <a class="navbar-brand" href="{{ path('home') }}"><img src="/images/logo.png" width="114" height="19" alt="Onemedia" /></a>
-                {% if is_granted('IS_AUTHENTICATED_FULLY') %}
+                {% if app.security.token and is_granted('IS_AUTHENTICATED_FULLY') %}
                     <ul class="nav navbar-nav">
                         <li{% if 'notifications' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('notifications') }}">Notifications</a></li>
                         {% if is_granted('ROLE_ADMIN') %}
                             <li{% if 'postRaw' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('postRaw') }}">Post Raw</a></li>
                         {% endif %}
                     </ul>
+                    <div class="pull-right">
+                        <a href="{{ path('admin_logout') }}" class="btn btn-link">Logout</a>
+                    </div>
                 {% endif %}
             </div>
         </div>
