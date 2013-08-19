@@ -18,6 +18,7 @@ $app['debug'] = $app['parameters']['debug'];
 $app['accessor'] = PropertyAccess::createPropertyAccessor();
 
 $app->register(new Silex\Provider\SessionServiceProvider());
+$app->register(new Silex\Provider\ValidatorServiceProvider());
 $app->register(new Silex\Provider\TwigServiceProvider(), array(
     'twig.path' => __DIR__.'/../src/views',
 ));
@@ -25,9 +26,6 @@ $app->register(new MongoDbServiceProvider(), array());
 $app->register(new Silex\Provider\UrlGeneratorServiceProvider());
 $app->register(new Silex\Provider\SecurityServiceProvider(), array(
     'security.firewalls' => array(
-        'public' => array(
-            'pattern' => '^/'
-        ),
         'backend' => array(
             'pattern' => '^/',
             'anonymous' => true,
@@ -83,3 +81,9 @@ $app->mount('/admin', new AdminControllerProvider());
 $app->mount('/', new PublicControllerProvider());
 
 $app->run();
+
+
+function applog($message)
+{
+    file_put_contents(__DIR__.'/../logs/app.log', $message . "\n", FILE_APPEND);
+}
