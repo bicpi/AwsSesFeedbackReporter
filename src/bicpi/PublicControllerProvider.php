@@ -38,6 +38,7 @@ class PublicControllerProvider implements ControllerProviderInterface
             if (null === $notification) {
                 $app->abort(501, 'Invalid JSON');
             }
+
             $type = $accessor->getValue($notification, '[Type]');
             if ('SubscriptionConfirmation' == $type) {
                 applog($request->getContent());
@@ -57,9 +58,7 @@ class PublicControllerProvider implements ControllerProviderInterface
             if ('Bounce' == $accessor->getValue($message, '[notificationType]')) {
                 $errors = $app['validator']->validateValue($message, $controller->getBounceConstraints());
                 if (count($errors)) {
-                    $messages = array(
-                        sprintf('%s Error when receiving bounce:', date('Y-m-d H:i:s'))
-                    );
+                    $messages = array(sprintf('%s Error when receiving bounce:', date('Y-m-d H:i:s')));
                     foreach ($errors as $errNo => $error) {
                         $messages[] = sprintf('%s%d: %s %s', str_repeat(' ', 4), $errNo+1, $error->getPropertyPath(), $error->getMessage());
                     }
@@ -88,12 +87,15 @@ class PublicControllerProvider implements ControllerProviderInterface
                 }
 
                 return new Response('Bounce(s) created', 201);
-            }
-
-            if ('Complaint' == $accessor->getValue($message, '[notificationType]')) {
+            } else if ('Complaint' == $accessor->getValue($message, '[notificationType]')) {
                 $errors = $app['validator']->validateValue($message, $controller->getComplaintConstraints());
                 if (count($errors)) {
-
+                    $messages = array(sprintf('%s Error when receiving complaint:', date('Y-m-d H:i:s')));
+                    foreach ($errors as $errNo => $error) {
+                        $messages[] = sprintf('%s%d: %s %s', str_repeat(' ', 4), $errNo+1, $error->getPropertyPath(), $error->getMessage());
+                    }
+                    applog(implode("\n", $messages));
+                    $app->abort(501, 'Invalid complaint');
                 }
 
                 foreach ($message['complaint']['complainedRecipients'] as $complainedRecipient) {
