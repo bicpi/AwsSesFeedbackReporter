@@ -21,7 +21,7 @@
                     {% for notification in pagination %}
                         <tr>
                             <td>
-                                {% if is_granted('ROLE_ADMIN') %}
+                                {% if is_granted('ROLE_SUPERADMIN') %}
                                     <a href="{{ path('deleteNotification', {_id: notification._id}) }}" class="close pull-right">&times;</a>
                                 {% endif %}
                                 <p>

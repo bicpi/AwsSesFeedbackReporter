@@ -3,3 +3,6 @@ dbname: aws_ses_feedback_reporter
 limit_per_page: 5
 dbuser: ~
 dbpassword: ~
+users: # Access passwords - please change them
+  admin: "admin"
+  superadmin: "superadmin"

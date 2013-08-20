@@ -10,6 +10,7 @@ use Symfony\Component\PropertyAccess\PropertyAccess;
 use bicpi\MongoDbServiceProvider;
 use bicpi\PublicControllerProvider;
 use bicpi\AdminControllerProvider;
+use Symfony\Component\Security\Core\Encoder\MessageDigestPasswordEncoder;
 
 $app = new Application();
 
@@ -24,6 +25,8 @@ $app->register(new Silex\Provider\TwigServiceProvider(), array(
 ));
 $app->register(new MongoDbServiceProvider(), array());
 $app->register(new Silex\Provider\UrlGeneratorServiceProvider());
+
+$encoder = new MessageDigestPasswordEncoder();
 $app->register(new Silex\Provider\SecurityServiceProvider(), array(
     'security.firewalls' => array(
         'backend' => array(
@@ -37,18 +40,18 @@ $app->register(new Silex\Provider\SecurityServiceProvider(), array(
                 'logout_path' => '/admin/logout'
             ),
             'users' => array(
-                'onemedia' => array('ROLE_ONEMEDIA', 'GCxwA99MnR0quW7//L8bGoDa9bvJuhTQ07pN0mC3zMk7XgCGKMxLUO+L6FQKgjFMRcXdsSjTmYTPeT7VBgTsFQ=='),
-                'admin' => array('ROLE_ADMIN', '6sgg49Cz8sTsqAGm/EdbpH/aEklyKtHY2A0hNa/gH89lWODQ1s1JKJFAjnRtwuwXDFNIwOyGdD0PPTwgxzhUSA=='),
+                'admin' => array('ROLE_ADMIN', $encoder->encodePassword($app['parameters']['users']['admin'], '')),
+                'superadmin' => array('ROLE_SUPERADMIN', $encoder->encodePassword($app['parameters']['users']['superadmin'], '')),
             ),
         ),
     ),
     'security.role_hierarchy' => array(
-        'ROLE_ADMIN' => array('ROLE_ONEMEDIA'),
+        'ROLE_SUPERADMIN' => array('ROLE_ADMIN'),
     ),
     'security.access_rules' => array(
         array('^/$', 'IS_AUTHENTICATED_ANONYMOUSLY'),
-        array('^/admin/notifications', 'ROLE_ONEMEDIA'),
-        array('^/admin', 'ROLE_ADMIN'),
+        array('^/admin/notifications', 'ROLE_ADMIN'),
+        array('^/admin', 'ROLE_SUPERADMIN'),
     )
 ));
 

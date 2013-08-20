@@ -21,7 +21,7 @@
                 {% if app.security.token and is_granted('IS_AUTHENTICATED_FULLY') %}
                     <ul class="nav navbar-nav">
                         <li{% if 'notifications' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('notifications') }}">Notifications</a></li>
-                        {% if is_granted('ROLE_ADMIN') %}
+                        {% if is_granted('ROLE_SUPERADMIN') %}
                             <li{% if 'postRaw' == app.request.get('_route') %} class="active"{% endif %}><a href="{{ path('postRaw') }}">Post Raw</a></li>
                         {% endif %}
                     </ul>
